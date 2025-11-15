@@ -8,7 +8,7 @@ permissions:
 jobs:
   automerge:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'sparfenyuk/mcp-proxy'
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'Pro-GenAI/mcp-proxy-guarded'
     steps:
       - name: Fetch metadata
         id: metadata

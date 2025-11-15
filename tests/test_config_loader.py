@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 import pytest
 from mcp.client.stdio import StdioServerParameters
 
-from mcp_proxy.config_loader import load_named_server_configs_from_file
+from mcp_proxy_guarded.config_loader import load_named_server_configs_from_file
 
 
 @pytest.fixture

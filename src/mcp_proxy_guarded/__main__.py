@@ -1,8 +1,8 @@
-"""The entry point for the mcp-proxy application. It sets up the logging and runs the main function.
+"""The entry point for the mcp-proxy-guarded application. It sets up the logging and runs the main function.
 
 Two ways to run the application:
-1. Run the application as a module `uv run -m mcp_proxy`
-2. Run the application as a package `uv run mcp-proxy`
+1. Run the application as a module `uv run -m mcp_proxy_guarded`
+2. Run the application as a package `uv run mcp-proxy-guarded`
 
 """
 
@@ -20,6 +20,7 @@ from httpx_auth import OAuth2ClientCredentials
 from mcp.client.stdio import StdioServerParameters
 
 from .config_loader import load_named_server_configs_from_file
+from .http_proxy import run_http_to_http_proxy
 from .mcp_server import MCPServerSettings, run_mcp_server
 from .sse_client import run_sse_client
 from .streamablehttp_client import run_streamablehttp_client
@@ -48,17 +49,17 @@ def _normalize_verify_ssl(value: str | bool | None) -> bool | str | None:
 def _setup_argument_parser() -> argparse.ArgumentParser:
     """Set up and return the argument parser for the MCP proxy."""
     parser = argparse.ArgumentParser(
-        description=("Start the MCP proxy in one of two possible modes: as a client or a server."),
+        description=("Start the MCP proxy in one of three possible modes: as a client, server, or HTTP-to-HTTP proxy."),
         epilog=(
             "Examples:\n"
-            "  mcp-proxy http://localhost:8080/sse\n"
-            "  mcp-proxy --no-verify-ssl https://server.local/sse\n"
-            "  mcp-proxy --transport streamablehttp http://localhost:8080/mcp\n"
-            "  mcp-proxy --headers Authorization 'Bearer YOUR_TOKEN' http://localhost:8080/sse\n"
-            "  mcp-proxy --port 8080 -- your-command --arg1 value1 --arg2 value2\n"
-            "  mcp-proxy --named-server fetch 'uvx mcp-server-fetch' --port 8080\n"
-            "  mcp-proxy your-command --port 8080 -e KEY VALUE -e ANOTHER_KEY ANOTHER_VALUE\n"
-            "  mcp-proxy your-command --port 8080 --allow-origin='*'\n"
+            "  mcp-proxy-guarded http://localhost:8080/sse\n"
+            "  mcp-proxy-guarded --no-verify-ssl https://server.local/sse\n"
+            "  mcp-proxy-guarded --transport streamablehttp http://localhost:8080/mcp\n"
+            "  mcp-proxy-guarded --port 8080 -- your-command --arg1 value1 --arg2 value2\n"
+            "  mcp-proxy-guarded --named-server fetch 'uvx mcp-server-fetch' --port 8080\n"
+            "  mcp-proxy-guarded --proxy-to http://localhost:8080/mcp --port 8081\n"
+            "  mcp-proxy-guarded your-command --port 8080 -e KEY VALUE -e ANOTHER_KEY ANOTHER_VALUE\n"
+            "  mcp-proxy-guarded your-command --port 8080 --allow-origin='*'\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -70,7 +71,7 @@ def _setup_argument_parser() -> argparse.ArgumentParser:
 def _add_arguments_to_parser(parser: argparse.ArgumentParser) -> None:
     """Add all arguments to the argument parser."""
     try:
-        package_version = version("mcp-proxy")
+        package_version = version("mcp-proxy-guarded")
     except Exception:  # noqa: BLE001
         package_version = "unknown"
 
@@ -143,6 +144,14 @@ def _add_arguments_to_parser(parser: argparse.ArgumentParser) -> None:
         action="store_const",
         const=False,
         help=("Disable SSL verification (alias for --verify-ssl false)."),
+    )
+
+    http_proxy_group = parser.add_argument_group("HTTP-to-HTTP proxy options")
+    http_proxy_group.add_argument(
+        "--proxy-to",
+        type=str,
+        metavar="TARGET_URL",
+        help="Enable HTTP-to-HTTP proxy mode. TARGET_URL is the MCP server to proxy requests to.",
     )
 
     stdio_client_options = parser.add_argument_group("stdio client options")
@@ -325,6 +334,49 @@ def _handle_sse_client_mode(
         )
 
 
+def _handle_http_proxy_mode(
+    args_parsed: argparse.Namespace,
+    logger: logging.Logger,
+    verify_ssl: bool | str | None = None,
+) -> None:
+    """Handle HTTP-to-HTTP proxy mode operation."""
+    logger.debug("Starting HTTP-to-HTTP proxy with classification")
+
+    # Collect headers
+    headers = dict(args_parsed.headers)
+    if api_access_token := os.getenv("API_ACCESS_TOKEN", None):
+        headers["Authorization"] = f"Bearer {api_access_token}"
+
+    # Collect client credentials and token url if provided
+    client_id = args_parsed.client_id
+    client_secret = args_parsed.client_secret
+    token_url = args_parsed.token_url
+
+    auth = (
+        OAuth2ClientCredentials(
+            client_id=client_id,
+            client_secret=client_secret,
+            token_url=token_url,
+        )
+        if client_id and client_secret and token_url
+        else None
+    )
+
+    # Create server settings
+    mcp_settings = _create_mcp_settings(args_parsed)
+
+    # Run the HTTP-to-HTTP proxy
+    asyncio.run(
+        run_http_to_http_proxy(
+            target_url=args_parsed.proxy_to,
+            settings=mcp_settings,
+            headers=headers,
+            auth=auth,
+            verify_ssl=verify_ssl,
+        ),
+    )
+
+
 def _configure_default_server(
     args_parsed: argparse.Namespace,
     base_env: dict[str, str],
@@ -440,13 +492,20 @@ def main() -> None:
         not args_parsed.command_or_url
         and not args_parsed.named_server_definitions
         and not args_parsed.named_server_config
+        and not getattr(args_parsed, 'proxy_to', None)
     ):
         parser.print_help()
         logger.error(
-            "Either a command_or_url for a default server or at least one --named-server "
-            "(or --named-server-config) must be provided for stdio mode.",
+            "Either a command_or_url for a default server, at least one --named-server "
+            "(or --named-server-config), or --proxy-to for HTTP-to-HTTP proxy mode must be provided.",
         )
         sys.exit(1)
+
+    # Handle HTTP-to-HTTP proxy mode
+    if getattr(args_parsed, 'proxy_to', None):
+        verify_ssl = _normalize_verify_ssl(getattr(args_parsed, "verify_ssl", None))
+        _handle_http_proxy_mode(args_parsed, logger, verify_ssl=verify_ssl)
+        return
 
     # Handle SSE client mode if URL is provided
     if args_parsed.command_or_url and args_parsed.command_or_url.startswith(

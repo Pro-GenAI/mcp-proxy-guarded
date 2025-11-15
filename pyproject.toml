@@ -1,5 +1,5 @@
 [project]
-name = "mcp-proxy"
+name = "mcp-proxy-guarded"
 description = "A MCP server which proxies requests to a remote MCP server over SSE transport."
 authors = [{ name = "Sergey Parfenyuk", email = "sergey.parfenyuk@gmail.com" }]
 license = { file = "LICENSE" }
@@ -28,21 +28,29 @@ classifiers = [
 ]
 version = "0.10.0"
 requires-python = ">=3.10"
-dependencies = ["httpx-auth>=0.22.0", "mcp>=1.17.0", "uvicorn>=0.34.0"]
+dependencies = [
+    "httpx-auth>=0.22.0",
+    "mcp>=1.17.0",
+    "uvicorn>=0.34.0",
+    "torch>=2.0.0",
+    "sentence-transformers>=2.0.0",
+    "numpy>=1.21.0",
+    "agent-action-classifier @ git+https://github.com/Pro-GenAI/AgentActionClassifier"
+]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
-Homepage = "https://github.com/sparfenyuk/mcp-proxy"
-Source = "https://github.com/sparfenyuk/mcp-proxy"
-Documentation = "https://github.com/sparfenyuk/mcp-proxy"
-Changelog = "https://github.com/sparfenyuk/mcp-proxy/releases"
+Homepage = "https://github.com/Pro-GenAI/mcp-proxy-guarded"
+Source = "https://github.com/Pro-GenAI/mcp-proxy-guarded"
+Documentation = "https://github.com/Pro-GenAI/mcp-proxy-guarded"
+Changelog = "https://github.com/Pro-GenAI/mcp-proxy-guarded/releases"
 
 [project.scripts]
-mcp-proxy = "mcp_proxy.__main__:main"
-mcp-reverse-proxy = "mcp_proxy.__main__:client"
+mcp-proxy-guarded = "mcp_proxy_guarded.__main__:main"
+mcp-reverse-proxy-guarded = "mcp_proxy_guarded.__main__:client"
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]

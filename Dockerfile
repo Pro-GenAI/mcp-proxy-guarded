@@ -34,4 +34,4 @@ COPY --from=uv /usr/libexec/podman/catatonit /usr/libexec/podman/
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
-ENTRYPOINT ["catatonit", "--", "mcp-proxy"]
+ENTRYPOINT ["catatonit", "--", "mcp-proxy-guarded"]

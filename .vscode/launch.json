@@ -8,7 +8,7 @@
       "justMyCode": false
     },
     {
-      "name": "Debug mcp-proxy",
+      "name": "Debug mcp-proxy-guarded",
       "type": "debugpy",
       "request": "launch",
       "console": "integratedTerminal",

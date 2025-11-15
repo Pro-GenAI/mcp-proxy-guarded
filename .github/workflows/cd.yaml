@@ -37,15 +37,15 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: sparfenyuk/mcp-proxy
+          images: Pro-GenAI/mcp-proxy-guarded
           tags: |
             type=sha,format=short,prefix=commit-
             type=ref,event=tag
           labels: |
             org.opencontainers.image.authors=Sergey Parfenyuk
-            org.opencontainers.image.source=https://github.com/sparfenyuk/mcp-proxy
-            org.opencontainers.image.url=https://github.com/sparfenyuk/mcp-proxy
-            org.opencontainers.image.title=mcp-proxy
+            org.opencontainers.image.source=https://github.com/Pro-GenAI/mcp-proxy-guarded
+            org.opencontainers.image.url=https://github.com/Pro-GenAI/mcp-proxy-guarded
+            org.opencontainers.image.title=mcp-proxy-guarded
             org.opencontainers.image.description=Connect to MCP servers that run on SSE transport, or expose stdio servers as an SSE server using the MCP Proxy server.
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.base.name=docker.io/library/python:3.13-alpine
@@ -94,15 +94,15 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ghcr.io/sparfenyuk/mcp-proxy
+          images: ghcr.io/Pro-GenAI/mcp-proxy-guarded
           tags: |
             type=sha,format=short,prefix=commit-
             type=ref,event=tag
           labels: |
             org.opencontainers.image.authors=Sergey Parfenyuk
-            org.opencontainers.image.source=https://github.com/sparfenyuk/mcp-proxy
-            org.opencontainers.image.url=https://github.com/sparfenyuk/mcp-proxy
-            org.opencontainers.image.title=mcp-proxy
+            org.opencontainers.image.source=https://github.com/Pro-GenAI/mcp-proxy-guarded
+            org.opencontainers.image.url=https://github.com/Pro-GenAI/mcp-proxy-guarded
+            org.opencontainers.image.title=mcp-proxy-guarded
             org.opencontainers.image.description=Connect to MCP servers that run on SSE transport, or expose stdio servers as an SSE server using the MCP Proxy server.
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.base.name=docker.io/library/python:3.13-alpine

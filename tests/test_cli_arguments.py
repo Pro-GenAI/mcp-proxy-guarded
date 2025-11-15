@@ -7,8 +7,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from mcp_proxy.__main__ import _normalize_verify_ssl, _setup_argument_parser
-from mcp_proxy.httpx_client import custom_httpx_client
+from mcp_proxy_guarded.__main__ import _normalize_verify_ssl, _setup_argument_parser
+from mcp_proxy_guarded.httpx_client import custom_httpx_client
 
 if t.TYPE_CHECKING:
     from argparse import ArgumentParser

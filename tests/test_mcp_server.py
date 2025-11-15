@@ -19,7 +19,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
-from mcp_proxy.mcp_server import MCPServerSettings, create_single_instance_routes, run_mcp_server
+from mcp_proxy_guarded.mcp_server import MCPServerSettings, create_single_instance_routes, run_mcp_server
 
 
 def create_starlette_app(
@@ -536,7 +536,7 @@ async def test_run_mcp_server_global_status_updates(
     mock_stdio_params: StdioServerParameters,
 ) -> None:
     """Test run_mcp_server updates global status correctly."""
-    from mcp_proxy.mcp_server import _global_status
+    from mcp_proxy_guarded.mcp_server import _global_status
 
     # Clear global status before test
     _global_status["server_instances"].clear()

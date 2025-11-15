@@ -4,12 +4,43 @@ This server is created independent of any transport mechanism.
 """
 
 import logging
-import typing as t
+from typing import Any
 
 from mcp import server, types
 from mcp.client.session import ClientSession
 
+from agent_action_classifier import is_action_harmful
+
 logger = logging.getLogger(__name__)
+
+
+def format_tool_call_for_classification(
+    tool_name: str, 
+    arguments: dict[str, Any] | None,
+    server_info: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Format a tool call request into the action dict format expected by the classifier.
+    
+    Args:
+        tool_name: Name of the tool being called
+        arguments: Arguments passed to the tool
+        server_info: Optional server information (server_label, server_url, etc.)
+    
+    Returns:
+        Action dict in the format expected by ActionClassifier
+    """
+    action_dict = {
+        "label": tool_name,
+        "resource": "Tool",
+        "action": {
+            "type": "mcp",
+            "server_label": server_info.get("server_label", "unknown") if server_info else "unknown",
+            "server_url": server_info.get("server_url", "") if server_info else "",
+            "parameters": arguments or {},
+            "require_approval": "never"  # Default, could be configurable
+        }
+    }
+    return action_dict
 
 
 async def create_proxy_server(remote_app: ClientSession) -> server.Server[object]:  # noqa: C901, PLR0915
@@ -24,7 +55,7 @@ async def create_proxy_server(remote_app: ClientSession) -> server.Server[object
     if capabilities.prompts:
         logger.debug("Capabilities: adding Prompts...")
 
-        async def _list_prompts(_: t.Any) -> types.ServerResult:  # noqa: ANN401
+        async def _list_prompts(_: Any) -> types.ServerResult:  # noqa: ANN401
             result = await remote_app.list_prompts()
             return types.ServerResult(result)
 
@@ -39,19 +70,41 @@ async def create_proxy_server(remote_app: ClientSession) -> server.Server[object
     if capabilities.resources:
         logger.debug("Capabilities: adding Resources...")
 
-        async def _list_resources(_: t.Any) -> types.ServerResult:  # noqa: ANN401
+        async def _list_resources(_: Any) -> types.ServerResult:  # noqa: ANN401
             result = await remote_app.list_resources()
             return types.ServerResult(result)
 
         app.request_handlers[types.ListResourcesRequest] = _list_resources
 
-        async def _list_resource_templates(_: t.Any) -> types.ServerResult:  # noqa: ANN401
+        async def _list_resource_templates(_: Any) -> types.ServerResult:  # noqa: ANN401
             result = await remote_app.list_resource_templates()
             return types.ServerResult(result)
 
         app.request_handlers[types.ListResourceTemplatesRequest] = _list_resource_templates
 
         async def _read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
+            # Filter if URI the request contains harmful parameters
+            action_dict = format_tool_call_for_classification(
+                tool_name=req.params.uri.path or "resource",
+                arguments={
+                    key: value for key, value in req.params.uri.query_params()
+                },
+                server_info={
+                    "server_url": str(req.params.uri),
+                    "server_label": "resource"
+                },
+            )
+
+            classification, confidence = is_action_harmful(action_dict)
+            if classification:
+                logger.warning(
+                    f"WARNING: Tool call '{req.params.uri.path}' classified as potentially '{classification}' "
+                    f"(confidence: {confidence:.2f}). Proceeding with caution."
+                )
+                raise ValueError(
+                    f"Blocked potentially harmful resource call '{req.params.uri}' "
+                )
+
             result = await remote_app.read_resource(req.params.uri)
             return types.ServerResult(result)
 
@@ -84,7 +137,7 @@ async def create_proxy_server(remote_app: ClientSession) -> server.Server[object
     if capabilities.tools:
         logger.debug("Capabilities: adding Tools...")
 
-        async def _list_tools(_: t.Any) -> types.ServerResult:  # noqa: ANN401
+        async def _list_tools(_: Any) -> types.ServerResult:  # noqa: ANN401
             tools = await remote_app.list_tools()
             return types.ServerResult(tools)
 
@@ -92,6 +145,25 @@ async def create_proxy_server(remote_app: ClientSession) -> server.Server[object
 
         async def _call_tool(req: types.CallToolRequest) -> types.ServerResult:
             try:
+                # Classify the action for potential harm
+                action_dict = format_tool_call_for_classification(
+                    tool_name=req.params.name, 
+                    arguments=req.params.arguments,
+                    server_info={
+                        "server_label": "tool"
+                    },
+                )
+
+                classification, confidence = is_action_harmful(action_dict)
+                if classification:
+                    logger.warning(
+                        f"WARNING: Tool call '{req.params.name}' classified as potentially '{classification}' "
+                        f"(confidence: {confidence:.2f}). Proceeding with caution."
+                    )
+                    raise ValueError(
+                        f"Blocked potentially harmful tool call '{req.params.name}' "
+                    )
+
                 result = await remote_app.call_tool(
                     req.params.name,
                     (req.params.arguments or {}),

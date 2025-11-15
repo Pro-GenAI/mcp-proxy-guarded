@@ -1,10 +1,19 @@
+# Guarded MCP proxy
+Implements Action Classifier project to filter harmful requests in mcp-proxy-guarded.
+Action Classifier repo: https://github.com/Pro-GenAI/Agent-Action-Classifier
+
+# Description of the original project
+Repo of mcp-proxy: https://github.com/Pro-GenAI/mcp-proxy
+
 # mcp-proxy
 
-![GitHub License](https://img.shields.io/github/license/sparfenyuk/mcp-proxy)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/mcp-proxy)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/mcp-proxy)
-[![codecov](https://codecov.io/gh/sparfenyuk/mcp-proxy/graph/badge.svg?token=31VV9L7AZQ)](https://codecov.io/gh/sparfenyuk/mcp-proxy)
+![GitHub License](https://img.shields.io/github/license/Pro-GenAI/mcp-proxy-guarded)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/mcp-proxy-guarded)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/mcp-proxy-guarded)
+[![codecov](https://codecov.io/gh/Pro-GenAI/mcp-proxy-guarded/graph/badge.svg?token=31VV9L7AZQ)](https://codecov.io/gh/Pro-GenAI/mcp-proxy-guarded)
 
+- [Guarded MCP proxy](#guarded-mcp-proxy)
+- [Description of the original project](#description-of-the-original-project)
 - [mcp-proxy](#mcp-proxy)
   - [About](#about)
   - [1. stdio to SSE/StreamableHTTP](#1-stdio-to-ssestreamablehttp)
@@ -27,7 +36,7 @@
 
 ## About
 
-The `mcp-proxy` is a tool that lets you switch between server transports. There are two supported modes:
+The `mcp-proxy-guarded` is a tool that lets you switch between server transports. There are two supported modes:
 
 1. stdio to SSE/StreamableHTTP
 2. SSE to stdio
@@ -41,7 +50,7 @@ natively.
 
 ```mermaid
 graph LR
-    A["Claude Desktop"] <--> |stdio| B["mcp-proxy"]
+    A["Claude Desktop"] <--> |stdio| B["mcp-proxy-guarded"]
     B <--> |SSE| C["External MCP Server"]
 
     style A fill:#ffe6f9,stroke:#333,color:black,stroke-width:2px
@@ -51,7 +60,7 @@ graph LR
 
 ### 1.1 Configuration
 
-This mode requires providing the URL of the MCP Server's SSE endpoint as the program’s first argument. If the server uses Streamable HTTP transport, make sure to enforce it on the `mcp-proxy` side by passing `--transport=streamablehttp`.
+This mode requires providing the URL of the MCP Server's SSE endpoint as the program’s first argument. If the server uses Streamable HTTP transport, make sure to enforce it on the `mcp-proxy-guarded` side by passing `--transport=streamablehttp`.
 
 Arguments
 
@@ -72,15 +81,15 @@ Environment Variables
 
 ### 1.2 Example usage
 
-`mcp-proxy` is supposed to be started by the MCP Client, so the configuration must be done accordingly.
+`mcp-proxy-guarded` is supposed to be started by the MCP Client, so the configuration must be done accordingly.
 
 For Claude Desktop, the configuration entry can look like this:
 
 ```json
 {
   "mcpServers": {
-    "mcp-proxy": {
-      "command": "mcp-proxy",
+    "mcp-proxy-guarded": {
+      "command": "mcp-proxy-guarded",
       "args": [
         "http://example.io/sse"
       ],
@@ -96,12 +105,12 @@ For Claude Desktop, the configuration entry can look like this:
 
 Run a proxy server exposing a SSE server that connects to a local stdio server.
 
-This allows remote connections to the local stdio server. The `mcp-proxy` opens a port to listen for SSE requests,
+This allows remote connections to the local stdio server. The `mcp-proxy-guarded` opens a port to listen for SSE requests,
 spawns a local stdio server that handles MCP requests.
 
 ```mermaid
 graph LR
-    A["LLM Client"] <-->|SSE| B["mcp-proxy"]
+    A["LLM Client"] <-->|SSE| B["mcp-proxy-guarded"]
     B <-->|stdio| C["Local MCP Server"]
 
     style A fill:#ffe6f9,stroke:#333,color:black,stroke-width:2px
@@ -135,30 +144,33 @@ Arguments
 
 ### 2.2 Example usage
 
-To start the `mcp-proxy` server that listens on port 8080 and connects to the local MCP server:
+To start the `mcp-proxy-guarded` server that listens on port 8080 and connects to the local MCP server:
 
 ```bash
 # Start the MCP server behind the proxy
-mcp-proxy uvx mcp-server-fetch
+mcp-proxy-guarded uvx mcp-server-fetch
+
+# Start the MCP server behind the proxy with a custom HTTP URL
+mcp-proxy-guarded --proxy-to http://localhost:8080/mcp --port 8081
 
 # Start the MCP server behind the proxy with a custom port
-# (deprecated) mcp-proxy --sse-port=8080 uvx mcp-server-fetch
-mcp-proxy --port=8080 uvx mcp-server-fetch
+# (deprecated) mcp-proxy-guarded --sse-port=8080 uvx mcp-server-fetch
+mcp-proxy-guarded --port=8080 uvx mcp-server-fetch
 
 # Start the MCP server behind the proxy with a custom host and port
-# (deprecated) mcp-proxy --sse-host=0.0.0.0 --sse-port=8080 uvx mcp-server-fetch
-mcp-proxy --host=0.0.0.0 --port=8080 uvx mcp-server-fetch
+# (deprecated) mcp-proxy-guarded --sse-host=0.0.0.0 --sse-port=8080 uvx mcp-server-fetch
+mcp-proxy-guarded --host=0.0.0.0 --port=8080 uvx mcp-server-fetch
 
 # Start the MCP server behind the proxy with a custom user agent
-# Note that the `--` separator is used to separate the `mcp-proxy` arguments from the `mcp-server-fetch` arguments
-# (deprecated) mcp-proxy --sse-port=8080 -- uvx mcp-server-fetch --user-agent=YourUserAgent
-mcp-proxy --port=8080 -- uvx mcp-server-fetch --user-agent=YourUserAgent
+# Note that the `--` separator is used to separate the `mcp-proxy-guarded` arguments from the `mcp-server-fetch` arguments
+# (deprecated) mcp-proxy-guarded --sse-port=8080 -- uvx mcp-server-fetch --user-agent=YourUserAgent
+mcp-proxy-guarded --port=8080 -- uvx mcp-server-fetch --user-agent=YourUserAgent
 
 # Start multiple named MCP servers behind the proxy
-mcp-proxy --port=8080 --named-server fetch 'uvx mcp-server-fetch' --named-server fetch2 'uvx mcp-server-fetch'
+mcp-proxy-guarded --port=8080 --named-server fetch 'uvx mcp-server-fetch' --named-server fetch2 'uvx mcp-server-fetch'
 
 # Start multiple named MCP servers using a configuration file
-mcp-proxy --port=8080 --named-server-config ./servers.json
+mcp-proxy-guarded --port=8080 --named-server-config ./servers.json
 ```
 
 ## Named Servers
@@ -210,7 +222,7 @@ The JSON file should follow this structure:
 - `command`: (Required) The command to execute for the stdio server.
 - `args`: (Optional) A list of arguments for the command. Defaults to an empty list.
 - `enabled`: (Optional) If `false`, this server definition will be skipped. Defaults to `true`.
-- `timeout` and `transportType`: These fields are present in standard MCP client configurations but are currently **ignored** by `mcp-proxy` when loading named servers. The transport type is implicitly "stdio".
+- `timeout` and `transportType`: These fields are present in standard MCP client configurations but are currently **ignored** by `mcp-proxy-guarded` when loading named servers. The transport type is implicitly "stdio".
 
 ## Installation
 
@@ -220,45 +232,45 @@ The stable version of the package is available on the PyPI repository. You can i
 
 ```bash
 # Option 1: With uv (recommended)
-uv tool install mcp-proxy
+uv tool install mcp-proxy-guarded
 
 # Option 2: With pipx (alternative)
-pipx install mcp-proxy
+pipx install mcp-proxy-guarded
 ```
 
-Once installed, you can run the server using the `mcp-proxy` command. See configuration options for each mode above.
+Once installed, you can run the server using the `mcp-proxy-guarded` command. See configuration options for each mode above.
 
 ### Installing via Github repository (latest)
 
 The latest version of the package can be installed from the git repository using the following command:
 
 ```bash
-uv tool install git+https://github.com/sparfenyuk/mcp-proxy
+uv tool install git+https://github.com/Pro-GenAI/mcp-proxy-guarded
 ```
 
 > [!NOTE]
 > If you have already installed the server, you can update it using `uv tool upgrade --reinstall` command.
 
 > [!NOTE]
-> If you want to delete the server, use the `uv tool uninstall mcp-proxy` command.
+> If you want to delete the server, use the `uv tool uninstall mcp-proxy-guarded` command.
 
 ### Installing as container
 
 Starting from version 0.3.2, it's possible to pull and run the corresponding container image:
 
 ```bash
-docker run --rm -t ghcr.io/sparfenyuk/mcp-proxy:v0.3.2-alpine --help
+docker run --rm -t ghcr.io/Pro-GenAI/mcp-proxy-guarded:v0.3.2-alpine --help
 ```
 
 ### Troubleshooting
 
 - **Problem**: Claude Desktop can't start the server: ENOENT code in the logs
 
-  **Solution**: Try to use the full path to the binary. To do so, open a terminal and run the command`which mcp-proxy` (
-  macOS, Linux) or `where.exe mcp-proxy` (Windows). Then, use the output path as a value for 'command' attribute:
+  **Solution**: Try to use the full path to the binary. To do so, open a terminal and run the command`which mcp-proxy-guarded` (
+  macOS, Linux) or `where.exe mcp-proxy-guarded` (Windows). Then, use the output path as a value for 'command' attribute:
   ```json
     "fetch": {
-      "command": "/full/path/to/bin/mcp-proxy",
+      "command": "/full/path/to/bin/mcp-proxy-guarded",
       "args": [
         "http://localhost:8932/sse"
       ]
@@ -267,13 +279,13 @@ docker run --rm -t ghcr.io/sparfenyuk/mcp-proxy:v0.3.2-alpine --help
 
 ## Extending the container image
 
-You can extend the `mcp-proxy` container image to include additional executables. For instance, `uv` is not included by
+You can extend the `mcp-proxy-guarded` container image to include additional executables. For instance, `uv` is not included by
 default, but you can create a custom image with it:
 
 ```Dockerfile
-# file: mcp-proxy.Dockerfile
+# file: mcp-proxy-guarded.Dockerfile
 
-FROM ghcr.io/sparfenyuk/mcp-proxy:latest
+FROM ghcr.io/Pro-GenAI/mcp-proxy-guarded:latest
 
 # Install the 'uv' package
 RUN python3 -m ensurepip && pip install --no-cache-dir uv
@@ -281,7 +293,7 @@ RUN python3 -m ensurepip && pip install --no-cache-dir uv
 ENV PATH="/usr/local/bin:$PATH" \
     UV_PYTHON_PREFERENCE=only-system
 
-ENTRYPOINT ["catatonit", "--", "mcp-proxy"]
+ENTRYPOINT ["catatonit", "--", "mcp-proxy-guarded"]
 ```
 
 ## Docker Compose Setup
@@ -290,10 +302,10 @@ With the custom Dockerfile, you can define a service in your Docker Compose file
 
 ```yaml
 services:
-  mcp-proxy-custom:
+  mcp-proxy-guarded-custom:
     build:
       context: .
-      dockerfile: mcp-proxy.Dockerfile
+      dockerfile: mcp-proxy-guarded.Dockerfile
     network_mode: host
     restart: unless-stopped
     ports:
@@ -308,7 +320,7 @@ services:
 ## Command line arguments
 
 ```bash
-usage: mcp-proxy [-h] [--version] [-H KEY VALUE]
+usage: mcp-proxy-guarded [-h] [--version] [-H KEY VALUE]
                  [--transport {sse,streamablehttp}] [--verify-ssl [VALUE]]
                  [--no-verify-ssl] [-e KEY VALUE] [--cwd CWD]
                  [--client-id CLIENT_ID] [--client-secret CLIENT_SECRET] [--token-url TOKEN_URL]
@@ -368,15 +380,15 @@ SSE server options:
                         Allowed origins for the SSE server. Can be used multiple times. Default is no CORS allowed.
 
 Examples:
-  mcp-proxy http://localhost:8080/sse
-  mcp-proxy --no-verify-ssl https://server.local/sse
-  mcp-proxy --transport streamablehttp http://localhost:8080/mcp
-  mcp-proxy --headers Authorization 'Bearer YOUR_TOKEN' http://localhost:8080/sse
-  mcp-proxy --client-id CLIENT_ID --client-secret CLIENT_SECRET --token-url https://auth.example.com/token http://localhost:8080/sse
-  mcp-proxy --port 8080 -- your-command --arg1 value1 --arg2 value2
-  mcp-proxy --named-server fetch 'uvx mcp-server-fetch' --port 8080
-  mcp-proxy your-command --port 8080 -e KEY VALUE -e ANOTHER_KEY ANOTHER_VALUE
-  mcp-proxy your-command --port 8080 --allow-origin='*'
+  mcp-proxy-guarded http://localhost:8080/sse
+  mcp-proxy-guarded --no-verify-ssl https://server.local/sse
+  mcp-proxy-guarded --transport streamablehttp http://localhost:8080/mcp
+  mcp-proxy-guarded --headers Authorization 'Bearer YOUR_TOKEN' http://localhost:8080/sse
+  mcp-proxy-guarded --client-id CLIENT_ID --client-secret CLIENT_SECRET --token-url https://auth.example.com/token http://localhost:8080/sse
+  mcp-proxy-guarded --port 8080 -- your-command --arg1 value1 --arg2 value2
+  mcp-proxy-guarded --named-server fetch 'uvx mcp-server-fetch' --port 8080
+  mcp-proxy-guarded your-command --port 8080 -e KEY VALUE -e ANOTHER_KEY ANOTHER_VALUE
+  mcp-proxy-guarded your-command --port 8080 --allow-origin='*'
 ```
 
 ### Example config file
@@ -411,15 +423,15 @@ Examples:
 
 ## Testing
 
-Check the `mcp-proxy` server by running it with the `mcp-server-fetch` server. You can use
+Check the `mcp-proxy-guarded` server by running it with the `mcp-server-fetch` server. You can use
 the [inspector tool](https://modelcontextprotocol.io/docs/tools/inspector) to test the target server.
 
 ```bash
 # Run the stdio server called mcp-server-fetch behind the proxy over SSE
-mcp-proxy --port=8080 uvx mcp-server-fetch &
+mcp-proxy-guarded --port=8080 uvx mcp-server-fetch &
 
-# Connect to the SSE proxy server spawned above using another instance of mcp-proxy given the URL of the SSE server
-mcp-proxy http://127.0.0.1:8080/sse
+# Connect to the SSE proxy server spawned above using another instance of mcp-proxy-guarded given the URL of the SSE server
+mcp-proxy-guarded http://127.0.0.1:8080/sse
 
 # Send CTRL+C to stop the second server
 

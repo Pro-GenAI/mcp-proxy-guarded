@@ -1,4 +1,4 @@
-"""Tests for the mcp-proxy module.
+"""Tests for the mcp-proxy-guarded module.
 
 Tests are running in two modes:
 - One where the server is exercised directly though an in memory client, just to
@@ -12,7 +12,7 @@ The same test code is run on both to ensure parity.
 import typing as t
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from mcp import types
@@ -22,7 +22,7 @@ from mcp.shared.exceptions import McpError
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
 
-from mcp_proxy.proxy_server import create_proxy_server
+from mcp_proxy_guarded.proxy_server import create_proxy_server
 
 TOOL_INPUT_SCHEMA = {"type": "object", "properties": {"input1": {"type": "string"}}}
 
@@ -537,3 +537,167 @@ async def test_call_tool_with_error(
 
         call_tool_result = await session.call_tool("tool", {})
         assert call_tool_result.isError
+
+
+class TestFormatToolCallForClassification:
+    """Test the format_tool_call_for_classification function."""
+
+    def test_format_basic_tool_call(self):
+        """Test formatting a basic tool call."""
+        from mcp_proxy_guarded.proxy_server import format_tool_call_for_classification
+
+        result = format_tool_call_for_classification(
+            tool_name="test_tool",
+            arguments={"arg1": "value1", "arg2": "value2"}
+        )
+
+        expected = {
+            "label": "test_tool",
+            "resource": "Tool",
+            "action": {
+                "type": "mcp",
+                "server_label": "unknown",
+                "server_url": "",
+                "parameters": {"arg1": "value1", "arg2": "value2"},
+                "require_approval": "never"
+            }
+        }
+
+        assert result == expected
+
+    def test_format_tool_call_with_server_info(self):
+        """Test formatting a tool call with server information."""
+        from mcp_proxy_guarded.proxy_server import format_tool_call_for_classification
+
+        server_info = {
+            "server_label": "weather_api",
+            "server_url": "https://api.weather.com/v1"
+        }
+
+        result = format_tool_call_for_classification(
+            tool_name="get_weather",
+            arguments={"location": "New York"},
+            server_info=server_info
+        )
+
+        expected = {
+            "label": "get_weather",
+            "resource": "Tool",
+            "action": {
+                "type": "mcp",
+                "server_label": "weather_api",
+                "server_url": "https://api.weather.com/v1",
+                "parameters": {"location": "New York"},
+                "require_approval": "never"
+            }
+        }
+
+        assert result == expected
+
+    def test_format_tool_call_no_arguments(self):
+        """Test formatting a tool call with no arguments."""
+        from mcp_proxy_guarded.proxy_server import format_tool_call_for_classification
+
+        result = format_tool_call_for_classification(
+            tool_name="list_items",
+            arguments=None
+        )
+
+        expected = {
+            "label": "list_items",
+            "resource": "Tool",
+            "action": {
+                "type": "mcp",
+                "server_label": "unknown",
+                "server_url": "",
+                "parameters": {},
+                "require_approval": "never"
+            }
+        }
+
+        assert result == expected
+
+    def test_format_tool_call_empty_server_info(self):
+        """Test formatting a tool call with empty server info."""
+        from mcp_proxy_guarded.proxy_server import format_tool_call_for_classification
+
+        result = format_tool_call_for_classification(
+            tool_name="test_tool",
+            arguments={"key": "value"},
+            server_info={}
+        )
+
+        expected = {
+            "label": "test_tool",
+            "resource": "Tool",
+            "action": {
+                "type": "mcp",
+                "server_label": "unknown",
+                "server_url": "",
+                "parameters": {"key": "value"},
+                "require_approval": "never"
+            }
+        }
+
+        assert result == expected
+
+
+class TestHarmfulActionBlocking:
+    """Test harmful action blocking in proxy server."""
+
+    @patch('mcp_proxy.proxy_server.is_action_harmful')
+    async def test_call_tool_safe_action(self, mock_is_harmful, session_generator, server_can_call_tool, tool_callback):
+        """Test that safe actions are allowed through."""
+        mock_is_harmful.return_value = (False, 0.2)  # Safe action
+
+        async with session_generator(server_can_call_tool) as session:
+            result = await session.initialize()
+            assert result.capabilities.tools
+
+            tool_callback.return_value = []
+            call_tool_result = await session.call_tool("safe_tool", {"param": "value"})
+
+            assert call_tool_result.content == []
+            assert not call_tool_result.isError
+            tool_callback.assert_called_once_with("safe_tool", {"param": "value"})
+            mock_is_harmful.assert_called_once()
+
+    @patch('mcp_proxy.proxy_server.is_action_harmful')
+    async def test_call_tool_harmful_action_blocked(self, mock_is_harmful, session_generator, server_can_call_tool, tool_callback):
+        """Test that harmful actions are blocked with appropriate error."""
+        mock_is_harmful.return_value = (True, 0.9)  # Harmful action
+
+        async with session_generator(server_can_call_tool) as session:
+            result = await session.initialize()
+            assert result.capabilities.tools
+
+            call_tool_result = await session.call_tool("dangerous_tool", {"param": "value"})
+
+            # Should be an error
+            assert call_tool_result.isError
+            assert len(call_tool_result.content) == 1
+            assert "potentially harmful" in call_tool_result.content[0].text
+            assert "confidence: 0.900" in call_tool_result.content[0].text
+            assert "dangerous_tool" in call_tool_result.content[0].text
+
+            # The actual tool should not be called
+            tool_callback.assert_not_called()
+            mock_is_harmful.assert_called_once()
+
+    @patch('mcp_proxy.proxy_server.is_action_harmful')
+    async def test_call_tool_classification_error_handled(self, mock_is_harmful, session_generator, server_can_call_tool, tool_callback):
+        """Test that classification errors are handled gracefully."""
+        mock_is_harmful.side_effect = Exception("Classification failed")
+
+        async with session_generator(server_can_call_tool) as session:
+            result = await session.initialize()
+            assert result.capabilities.tools
+
+            tool_callback.return_value = []
+            call_tool_result = await session.call_tool("tool", {})
+
+            # Should still work despite classification error
+            assert call_tool_result.content == []
+            assert not call_tool_result.isError
+            tool_callback.assert_called_once_with("tool", {})
+            mock_is_harmful.assert_called_once()

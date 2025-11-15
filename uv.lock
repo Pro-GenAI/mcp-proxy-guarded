@@ -311,7 +311,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp-proxy"
+name = "mcp-proxy-guarded"
 version = "0.10.0"
 source = { editable = "." }
 dependencies = [
