@@ -160,8 +160,25 @@ async def create_proxy_server(remote_app: ClientSession) -> server.Server[object
                         f"WARNING: Tool call '{req.params.name}' classified as potentially '{classification}' "
                         f"(confidence: {confidence:.2f}). Proceeding with caution."
                     )
-                    raise ValueError(
-                        f"Blocked potentially harmful tool call '{req.params.name}' "
+                    return types.ServerResult(
+                        types.CallToolResult(
+                            content=[
+                                types.TextContent(
+                                    type="text",
+                                    text=(
+                                        f"Tool call '{req.params.name}' blocked due to potential '{classification}'"
+                                        f" with confidence {confidence:.2f}. Only safe actions are allowed."
+                                    )
+                                )
+                            ],
+                            structuredContent={
+                                "blocked": True,
+                                "reason": "potentially harmful/unethical action",
+                                "classification": classification,
+                                "confidence": confidence,
+                            },
+                            isError=True,
+                        ),
                     )
 
                 result = await remote_app.call_tool(
