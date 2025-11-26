@@ -19,7 +19,7 @@ from starlette.types import Receive, Scope, Send
 
 from .httpx_client import custom_httpx_client
 from .mcp_server import MCPServerSettings, _global_status, _update_global_activity
-from .proxy_server import create_proxy_server
+from .proxy_server import create_direct_proxy_server, create_guarded_proxy_server
 
 logger = logging.getLogger(__name__)
 
@@ -51,19 +51,32 @@ async def run_http_to_http_proxy(
     ) as (read, write, _):
         async with ClientSession(read, write) as session:
             # Create the proxy server with classification
-            proxy_app = await create_proxy_server(session)
+            proxy_app = await create_guarded_proxy_server(session)
 
-            # Set up HTTP server with StreamableHTTP transport
-            session_manager = StreamableHTTPSessionManager(
+            # Create the direct proxy server without classification
+            direct_proxy_app = await create_direct_proxy_server(session)
+
+            # Set up HTTP server with StreamableHTTP transport for guarded proxy
+            guarded_session_manager = StreamableHTTPSessionManager(
                 proxy_app,
                 stateless=settings.stateless,
             )
 
-            async def handle_mcp_request(scope: Scope, receive: Receive, send: Send) -> None:
-                await session_manager.handle_request(scope, receive, send)
+            # Set up HTTP server with StreamableHTTP transport for direct proxy
+            direct_session_manager = StreamableHTTPSessionManager(
+                direct_proxy_app,
+                stateless=settings.stateless,
+            )
+
+            async def handle_guarded_mcp_request(scope: Scope, receive: Receive, send: Send) -> None:
+                await guarded_session_manager.handle_request(scope, receive, send)
+
+            async def handle_direct_mcp_request(scope: Scope, receive: Receive, send: Send) -> None:
+                await direct_session_manager.handle_request(scope, receive, send)
 
             routes: list[BaseRoute] = [
-                Mount("/mcp", handle_mcp_request),
+                Mount("/mcp", handle_guarded_mcp_request),
+                Mount("/unguarded-mcp", handle_direct_mcp_request),
             ]
 
             # Add status endpoint
@@ -108,5 +121,5 @@ async def run_http_to_http_proxy(
             logger.info(f"HTTP-to-HTTP proxy listening on {settings.bind_host}:{settings.port}")
             logger.info(f"Proxying requests to {target_url}")
 
-            async with session_manager.run():
+            async with guarded_session_manager.run(), direct_session_manager.run():
                 await server.serve()

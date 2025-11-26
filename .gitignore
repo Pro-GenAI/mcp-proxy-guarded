@@ -171,4 +171,4 @@ cython_debug/
 .pypirc
 
 # Custom folders/files
-agent_action_classifier
+agent_action_guard*

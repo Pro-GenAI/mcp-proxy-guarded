@@ -22,7 +22,7 @@ from mcp.shared.exceptions import McpError
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
 
-from mcp_proxy_guarded.proxy_server import create_proxy_server
+from mcp_proxy_guarded.proxy_server import create_guarded_proxy_server
 
 TOOL_INPUT_SCHEMA = {"type": "object", "properties": {"input1": {"type": "string"}}}
 
@@ -46,7 +46,7 @@ def tool() -> types.Tool:
 async def proxy(server: Server[object]) -> AsyncGenerator[ClientSession, None]:
     """Create a connection to the server through the proxy server."""
     async with in_memory(server) as session:
-        wrapped_server = await create_proxy_server(session)
+        wrapped_server = await create_guarded_proxy_server(session)
         async with in_memory(wrapped_server) as wrapped_session:
             yield wrapped_session
 

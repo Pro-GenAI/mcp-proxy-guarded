@@ -9,7 +9,7 @@ from mcp.client.sse import sse_client
 from mcp.server.stdio import stdio_server
 
 from .httpx_client import custom_httpx_client
-from .proxy_server import create_proxy_server
+from .proxy_server import create_guarded_proxy_server
 
 
 async def run_sse_client(
@@ -36,7 +36,7 @@ async def run_sse_client(
         ) as streams,
         ClientSession(*streams) as session,
     ):
-        app = await create_proxy_server(session)
+        app = await create_guarded_proxy_server(session)
         async with stdio_server() as (read_stream, write_stream):
             await app.run(
                 read_stream,

@@ -21,7 +21,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import BaseRoute, Mount, Route
 from starlette.types import Receive, Scope, Send
 
-from .proxy_server import create_proxy_server
+from .proxy_server import create_guarded_proxy_server, create_direct_proxy_server
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def create_single_instance_routes(
         updated_scope = scope
         if scope.get("type") == "http":
             path = scope.get("path", "")
-            if path and path.rstrip("/") == "/mcp" and not path.endswith("/"):
+            if path and path.rstrip("/") in ["/mcp", "/unguarded-mcp"] and not path.endswith("/"):
                 updated_scope = dict(scope)
                 normalized_path = path + "/"
                 logger.debug(
@@ -132,6 +132,13 @@ def create_single_instance_routes(
             include_in_schema=False,
         ),
         Mount("/mcp", app=handle_streamable_http_instance),
+        Route(
+            "/unguarded-mcp",
+            endpoint=_ASGIEndpointAdapter(handle_streamable_http_instance),
+            methods=HTTP_METHODS,
+            include_in_schema=False,
+        ),
+        Mount("/unguarded-mcp", app=handle_streamable_http_instance),
         Route("/sse", endpoint=handle_sse_instance),
         Mount("/messages/", app=sse_transport.handle_post_message),
     ]
@@ -169,10 +176,11 @@ async def run_mcp_server(
             )
             stdio_streams = await stack.enter_async_context(stdio_client(default_server_params))
             session = await stack.enter_async_context(ClientSession(*stdio_streams))
-            proxy = await create_proxy_server(session)
+            guarded_proxy = await create_guarded_proxy_server(session)
+            direct_proxy = await create_direct_proxy_server(session)
 
             instance_routes, http_manager = create_single_instance_routes(
-                proxy,
+                guarded_proxy,
                 stateless_instance=mcp_settings.stateless,
             )
             await stack.enter_async_context(http_manager.run())  # Manage lifespan by calling run()
@@ -189,10 +197,11 @@ async def run_mcp_server(
             )
             stdio_streams_named = await stack.enter_async_context(stdio_client(params))
             session_named = await stack.enter_async_context(ClientSession(*stdio_streams_named))
-            proxy_named = await create_proxy_server(session_named)
+            guarded_proxy_named = await create_guarded_proxy_server(session_named)
+            direct_proxy_named = await create_direct_proxy_server(session_named)
 
             instance_routes_named, http_manager_named = create_single_instance_routes(
-                proxy_named,
+                guarded_proxy_named,
                 stateless_instance=mcp_settings.stateless,
             )
             await stack.enter_async_context(

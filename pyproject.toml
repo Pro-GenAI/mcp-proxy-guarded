@@ -35,7 +35,7 @@ dependencies = [
     "torch>=2.0.0",
     "sentence-transformers>=2.0.0",
     "numpy>=1.21.0",
-    "agent-action-classifier @ git+https://github.com/Pro-GenAI/AgentActionClassifier"
+    "agent-action-guard @ git+https://github.com/Pro-GenAI/Agent-Action-Guard"
 ]
 
 [build-system]
