@@ -9,7 +9,7 @@ from typing import Any
 from mcp import server, types
 from mcp.client.session import ClientSession
 
-from agent_action_classifier import is_action_harmful
+from agent_action_guard import is_action_harmful
 
 logger = logging.getLogger(__name__)
 
